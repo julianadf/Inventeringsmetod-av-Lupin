@@ -1,0 +1,17 @@
+Area;Plant density;Count
+Heby;Single;427
+Heby;Sparse;312
+Heby;Dense;314
+Heby;Dominated;92
+Enköping;Single;216
+Enköping;Sparse;254
+Enköping;Dense;93
+Enköping;Dominated;1
+Sveg;Single;94
+Sveg;Sparse;82
+Sveg;Dense;42
+Sveg;Dominated;7
+Uppsala;Single;59
+Uppsala;Sparse;35
+Uppsala;Dense;51
+Uppsala;Dominated;24
