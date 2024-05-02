@@ -39,7 +39,8 @@ db <- raw %>%
   mutate(Varierande = dplyr::recode(Varierande, "Nej"= "No")) %>%
   mutate(Beståndet = dplyr::recode(Beståndet, "Både inner och ytterslänt"= "Both inner and outer ditch slopes")) %>%
   mutate(Beståndet = dplyr::recode(Beståndet, "Innerslänt"= "Inner ditch slope")) %>%
-  mutate(Beståndet = dplyr::recode(Beståndet, "Ytterslänt"= "Outer ditch slope")) 
+  mutate(Beståndet = dplyr::recode(Beståndet, "Ytterslänt"= "Outer ditch slope")) %>% 
+  mutate(Område = dplyr::recode(Område, "Sveg"= "Funäsdalen"))
 db 
 summary(db)
 
@@ -289,15 +290,24 @@ gg.längdtät
 # Figure 2
 fig2 <- read.csv2(here("data", "Car survey summary density area.csv"))
 
+fig2.perc <- fig2 %>% 
+  group_by(Area) %>% 
+  mutate(percent= prop.table(Count) * 100) %>% 
+fig2.perc
+
+fig2.perc$label <- paste0(round(fig2.perc$Count, 2), "\n(", round(fig2.perc$percent, 1), "%)")
+
 fig2 <- fig2 %>% 
   mutate(Plant.density=fct_relevel(Plant.density, "Single", "Sparse", "Dense", "Dominated")) %>% 
   mutate(Area=fct_relevel(Area, "Heby", "Enköping", "Uppsala", "Sveg"))
 
-gg.fig2 <- ggplot(fig2, aes(x=Plant.density, y=Count, fill=Plant.density)) + geom_col(color="black") +
+gg.fig2 <- ggplot(fig2.perc, aes(x=Plant.density, y=Count, fill=Plant.density)) + geom_col(color="black") +
   facet_wrap(vars(Area), nrow =2) +
-  #geom_text(aes(label=Count), position=position_dodge(width = 0.00001)) +
+  #geom_text(aes(label=Count), position=position_stack(vjust=1.)) +
+  geom_text(aes(label=label), position=position_stack(vjust=0.99999)) +
   scale_fill_manual(values =c("#a6bddb", "#a6bddb", "#a6bddb", "#a6bddb")) +
   theme_bw() +
+  ylim(0,470) +
   ylab("Number of stands") +
   theme(legend.position = "none", 
         axis.title.x = element_blank(),
@@ -308,3 +318,4 @@ gg.fig2 <- ggplot(fig2, aes(x=Plant.density, y=Count, fill=Plant.density)) + geo
         )
 
 gg.fig2  
+

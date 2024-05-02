@@ -34,11 +34,12 @@ db <- raw %>%
   mutate(Täthet = dplyr::recode(Täthet, "Dominerande >90%"= "Dominating >90%")) %>%
   mutate(Varierande = as.factor(Varierande)) %>% 
   mutate(Beståndet  = as.factor(Beståndet)) %>% 
-  mutate(Beståndet = dplyr::recode(Beståndet, "Både inner och ytterslänt"= "Both inner and outer ditch slopes")) %>%
-  mutate(Beståndet = dplyr::recode(Beståndet, "Innerslänt"= "Inner ditch slope")) %>%
-  mutate(Beståndet = dplyr::recode(Beståndet, "Ytterslänt"= "Outer ditch slope")) %>%
+  mutate(Beståndet = dplyr::recode(Beståndet, "Både inner och ytterslänt"= "Both side and back slopes")) %>%
+  mutate(Beståndet = dplyr::recode(Beståndet, "Innerslänt"= "Side slope")) %>%
+  mutate(Beståndet = dplyr::recode(Beståndet, "Ytterslänt"= "Back slope")) %>%
   rename(Detected.with.car = Missades.med.bilen) %>% 
   mutate(Detected.with.car = as.factor(Detected.with.car)) %>% 
+  mutate(Område = dplyr::recode(Område, "Sveg"= "Funäsdalen")) %>% 
   #So it is more straightforward, renamed "missed with car" to "Detected", so ja= detected, nej = missed
   mutate(Detected.with.car = dplyr::recode(Detected.with.car, "Ja"= 0, "Nej"=1)) %>% 
   # Before was 1 for "missed with car", 0 for "found with car". Now its 1 for "detected with car", 0 for "missed". 
@@ -46,16 +47,19 @@ db <- raw %>%
 db 
 summary(db)
 
-mod.final <- glm(Detected.with.car ~ Beståndet + Täthet + Område + Förekomst, family= "binomial", data=db) 
+mod.final <- glmmTMB(Detected.with.car ~ Beståndet + Täthet + Förekomst + (1| Område), family= "binomial", data=db) 
+mod.final2 <- glmer(Detected.with.car ~ Beståndet + Täthet + Förekomst + (1| Område), family= "binomial", data=db) 
 summary(mod.final) #estimates are log-odds
+plot(allEffects(mod.final))
+AICc(mod.final)
 mod_dharma1 <- mod.final %>% simulateResiduals(n=1000)
 plot(mod_dharma1)
-vif(mod.final)
+car::vif(mod.final2)
 
 car::Anova(mod.final, type= "III")
 tab_model(mod.final)
 
-visreg(mod.final, scale = "response")
+MArvisreg(mod.final, scale = "response")
 
 # Figures ----
 
@@ -133,6 +137,52 @@ gg.best <- ggplot(em, aes(Beståndet, prob)) +
   )
 gg.best
 
+# Post-hoc: Förekomst utanför vägområdet
+utanf.em <- emmeans(mod.final, ~ Förekomst , type="response")
+utanf.emms <- emmeans(mod.final, "Förekomst")
+# Effect size:
+print(eff_size(utanf.em, sigma=sigma(mod.final), edf=df.residual(mod.final)))
+eff_size(pairs(utanf.em), sigma(mod.final), df.residual(mod.final), method = "identity") # another way of writing the above
+# 
+pairs(utanf.emms)
+plot(utanf.emms, comparisons=TRUE)
+
+# Adam Flöhr:
+em.utanf <- as.data.frame(utanf.em)
+ggplot(em.utanf, aes(Förekomst, prob)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.1) +
+  ylab("") +
+  coord_cartesian(ylim = c(0,1)) +
+  theme_bw() +
+  theme(panel.grid.major.x = element_blank())
+
+em <- multcomp::cld(utanf.em, Letters = letters)
+em <- as.data.frame(em)
+gg.utanf <- ggplot(em, aes(Förekomst, prob)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL)) +#, width = 0.1) +
+  coord_cartesian(ylim = c(0,1.1)) +
+  geom_text(aes(y = 1.1, label = .group)) +
+  xlab("Stand continues outside the road verge") +
+  ylab("P(detecting a stand)") +
+  scale_x_discrete(labels=c("Yes", "No")) +
+  theme_bw() +
+  theme(axis.text.x = element_text(size=14),
+        axis.text.y= element_text(size=14),
+        axis.title.x = element_text(size=16),
+        axis.title.y = element_text(size=16)
+  )
+gg.utanf  
+ 
+# Null model ----
+mod.null <- glmmTMB(Detected.with.car ~ 1 + (1| Område), family= "binomial", data=db) 
+AICc(mod.final) # 198.1173
+AICc(mod.null) # 254.8196
+
+
+
+# gammal kod -----
 # Post-hoc: Område
 omr.em <- emmeans(mod.final, ~ Område , type="response")
 omr.emms <- emmeans(mod.final, "Område")
@@ -171,46 +221,5 @@ gg.omr <- ggplot(em, aes(Område, prob)) +
 gg.omr
 
 
-# Post-hoc: Förekomst utanför vägområdet
-utanf.em <- emmeans(mod.final, ~ Förekomst , type="response")
-utanf.emms <- emmeans(mod.final, "Förekomst")
-# Effect size:
-print(eff_size(untanf.em, sigma=sigma(mod.final), edf=df.residual(mod.final)))
-eff_size(pairs(utanf.em), sigma(mod.final), df.residual(mod.final), method = "identity") # another way of writing the above
-# 
-pairs(utanf.emms)
-plot(utanf.emms, comparisons=TRUE)
 
-# Adam Flöhr:
-em.utanf <- as.data.frame(utanf.em)
-ggplot(em.utanf, aes(Förekomst, prob)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.1) +
-  ylab("") +
-  coord_cartesian(ylim = c(0,1)) +
-  theme_bw() +
-  theme(panel.grid.major.x = element_blank())
-
-em <- multcomp::cld(utanf.em, Letters = letters)
-em <- as.data.frame(em)
-gg.utanf <- ggplot(em, aes(Förekomst, prob)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL)) +#, width = 0.1) +
-  coord_cartesian(ylim = c(0,1.1)) +
-  geom_text(aes(y = 1.1, label = .group)) +
-  xlab("Stand continues outside the road verge") +
-  ylab("P(detecting a stand)") +
-  scale_x_discrete(labels=c("Yes", "No")) +
-  theme_bw() +
-  theme(axis.text.x = element_text(size=14),
-        axis.text.y= element_text(size=14),
-        axis.title.x = element_text(size=16),
-        axis.title.y = element_text(size=16)
-  )
-gg.utanf  
- 
-# Null model ----
-mod.null <- glm(Detected.with.car ~ 1, family= "binomial", data=db) 
-AICc(mod.final) # 240.036
-AICc(mod.null) # 319.0523
 
